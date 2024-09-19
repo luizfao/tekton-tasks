@@ -1,0 +1,65 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  labels:
+    type: pipeline
+  name: demo-podinfo-app-build
+  namespace: demo-podinfo
+spec:
+  params:
+    - default: 'https://gitlab-gitlab.apps.cluster-sg6ws.sg6ws.sandbox1399.opentlc.com/development/demo-podinfo-1.git'
+      description: source repo that contains the application code
+      name: source-repo
+      type: string
+    - default: main
+      description: source branch to build from
+      name: source-branch
+      type: string
+    - default: quay-sg6ws.apps.cluster-sg6ws.sg6ws.sandbox1399.opentlc.com/quayadmin/demo-podinfo-1
+      description: reference of the image that will get created
+      name: output-image
+      type: string
+  tasks:
+    - name: git-clone
+      params:
+        - name: url
+          value: $(params.source-repo)
+        - name: revision
+          value: $(params.source-branch)
+      taskRef:
+        kind: ClusterTask
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: source-folder
+    - name: build-and-push
+      params:
+        - name: IMAGE
+          value: $(params.output-image)
+      runAfter:
+        - git-clone
+      taskRef:
+        kind: Task
+        name: kaniko
+      workspaces:
+        - name: source
+          workspace: source-folder
+        - name: dockerconfig
+          workspace: docker-config
+    - name: humanitec-deployment
+      params:
+        - name: CI_COMMIT_SHA
+          value: $(tasks.git-clone.results.commit)
+        - name: CI_PROJECT_URL
+          value: $(tasks.git-clone.results.url)
+      runAfter:
+        - build-and-push
+      taskRef:
+        kind: Task
+        name: humctl
+      workspaces:
+        - name: score
+          workspace: source-folder
+  workspaces:
+    - name: source-folder
+    - name: docker-config
