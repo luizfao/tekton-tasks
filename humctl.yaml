@@ -4,15 +4,22 @@ metadata:
   name: humctl
   namespace: demo-podinfo
 spec:
-  description: This task runs commands against Humanitec API.
+  description: Deploy an application using Humanitec Orchestrator thru humctl.
   params:
-    - description: App name to be mapped to Humanitec
+    - default: htc
+      description: Secret name containing Humanitec organization and token
+      name: humanitec-secret
+      type: string
+    - default: demo-podinfo-1
+      description: App name to be mapped to Humanitec
       name: APP_NAME
       type: string
-    - description: Image Name
+    - default: demo-podinfo-1
+      description: Image Name
       name: IMAGE_NAME
       type: string
-    - description: Image Registry URL/Project
+    - default: quay-sg6ws.apps.cluster-sg6ws.sg6ws.sandbox1399.opentlc.com/quayadmin
+      description: Image Registry URL/Project
       name: IMAGE_REGISTRY
       type: string
     - default: '1'
@@ -23,7 +30,8 @@ spec:
       description: Reference name branch or tag
       name: CI_COMMIT_REF_NAME
       type: string
-    - description: Project git URL
+    - default: 'https://gitlab-gitlab.apps.cluster-sg6ws.sg6ws.sandbox1399.opentlc.com/development/demo-podinfo-1'
+      description: Project git URL
       name: CI_PROJECT_URL
       type: string
     - default: Update version
@@ -45,12 +53,12 @@ spec:
           valueFrom:
             secretKeyRef:
               key: organization
-              name: htc
+              name: $(params.humanitec-secret)
         - name: HUMANITEC_TOKEN
           valueFrom:
             secretKeyRef:
               key: token
-              name: htc
+              name: $(params.humanitec-secret)
       image: 'ghcr.io/humanitec/cli:0.30.1'
       name: create-artefact-version
       securityContext:
@@ -71,12 +79,12 @@ spec:
           valueFrom:
             secretKeyRef:
               key: organization
-              name: htc
+              name: $(params.humanitec-secret)
         - name: HUMANITEC_TOKEN
           valueFrom:
             secretKeyRef:
               key: token
-              name: htc
+              name: $(params.humanitec-secret)
       image: 'ghcr.io/humanitec/cli:0.30.1'
       name: score-deploy
       securityContext:
@@ -85,6 +93,3 @@ spec:
   workspaces:
     - description: Application's score file directory
       name: score
-    - description: 'Secret (htc) containing Humanitec organization and token. This workspace is for documentation only, the secret is used directly not as a workspace.'
-      name: htc
-      optional: true
