@@ -1,0 +1,90 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: humctl
+  namespace: demo-podinfo
+spec:
+  description: This task runs commands against Humanitec API.
+  params:
+    - description: App name to be mapped to Humanitec
+      name: APP_NAME
+      type: string
+    - description: Image Name
+      name: IMAGE_NAME
+      type: string
+    - description: Image Registry URL/Project
+      name: IMAGE_REGISTRY
+      type: string
+    - default: '1'
+      description: Commit hash
+      name: CI_COMMIT_SHA
+      type: string
+    - default: refs/heads/main
+      description: Reference name branch or tag
+      name: CI_COMMIT_REF_NAME
+      type: string
+    - description: Project git URL
+      name: CI_PROJECT_URL
+      type: string
+    - default: Update version
+      description: Commit message
+      name: CI_COMMIT_MESSAGE
+      type: string
+  steps:
+    - args:
+        - create
+        - artefact-version
+        - '-t=container'
+        - '-n=$(params.IMAGE_REGISTRY)/$(params.IMAGE_NAME)'
+        - '--version=$(params.CI_COMMIT_SHA)'
+        - '--ref=$(params.CI_COMMIT_REF_NAME)'
+        - '--commit=$(params.CI_COMMIT_MESSAGE)'
+      computeResources: {}
+      env:
+        - name: HUMANITEC_ORG
+          valueFrom:
+            secretKeyRef:
+              key: organization
+              name: htc
+        - name: HUMANITEC_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: token
+              name: htc
+      image: 'ghcr.io/humanitec/cli:0.30.1'
+      name: create-artefact-version
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+    - args:
+        - score
+        - deploy
+        - '--app=$(params.APP_NAME)'
+        - '--env=development'
+        - '-f=$(workspaces.score.path)/score.yaml'
+        - '--extensions=$(workspaces.score.path)/humanitec.score.yaml'
+        - '--image=$(params.IMAGE_REGISTRY)/$(params.IMAGE_NAME):$(params.CI_COMMIT_SHA)'
+        - '--message="$(params.CI_COMMIT_MESSAGE)"'
+      computeResources: {}
+      env:
+        - name: HUMANITEC_ORG
+          valueFrom:
+            secretKeyRef:
+              key: organization
+              name: htc
+        - name: HUMANITEC_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: token
+              name: htc
+      image: 'ghcr.io/humanitec/cli:0.30.1'
+      name: score-deploy
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+  workspaces:
+    - description: Application's score file directory
+      name: score
+    - description: 'Secret (htc) containing Humanitec organization and token. This workspace is for documentation only, the secret is used directly not as a workspace.'
+      name: htc
+      optional: true
